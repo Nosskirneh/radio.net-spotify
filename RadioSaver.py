@@ -123,12 +123,20 @@ class RadioSaver:
             tracks.extend(results['items'])
         return tracks
 
+    # Method to refresh Spotify token
+    def refresh_token(self):
+        cached_token = self.spotify.get_cached_token()
+        refreshed_token = cached_token['refresh_token']
+        new_token = self.spotify.refresh_access_token(refreshed_token)
+        self.spotify = spotipy.Spotify(auth=new_token['access_token'])
+
 ## Main
 saver = RadioSaver()
 saver.init_spotify()
 saver.process_music()
 
 schedule.every(3).minutes.do(saver.process_music)
+schedule.every(59).minutes.do(saver.refresh_token) # Spotify tokens are valid for one hour
 
 while True:
     schedule.run_pending()
