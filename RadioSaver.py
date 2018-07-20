@@ -87,7 +87,9 @@ class RadioSaver:
             res = self.spotify.search(q=track, type='track', limit=1)
             tracks = res["tracks"]
 
+            processed_tracks.append(track)
             if len(tracks["items"]) < 1:
+                print("No tracks found\n")
                 continue
 
             item = tracks["items"][0]
