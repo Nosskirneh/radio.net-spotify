@@ -84,7 +84,7 @@ class RadioSaver:
         track_uris = []
         for track in tracks_to_add:
             print("Will search for track: ", track)
-            res = self.spotify.search(q=track, type='track')
+            res = self.spotify.search(q=track, type='track', limit=1)
             tracks = res["tracks"]
 
             if len(tracks["items"]) < 1:
