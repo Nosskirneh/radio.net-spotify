@@ -12,12 +12,22 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 import json
 from collections import deque
+from os.path import exists
+
+HISTORY_FILE = 'history.json'
 
 class RadioSaver:
     # Store the last ten tracks for each station, to prevent adding the same track over and over
     allAddedTracks = {}
-    for station in stations:
-        allAddedTracks[station["station_id"]] = deque(maxlen=10)
+    if exists(HISTORY_FILE):
+        with open(HISTORY_FILE, 'r') as file:
+            allAddedTracks = json.load(file)
+            for station in stations: # Transfer the JSON data to deques
+                station_id = station["station_id"]
+                allAddedTracks[station_id] = deque(allAddedTracks[str(station_id)], maxlen=10)
+    else:
+        for station in stations:
+            allAddedTracks[station["station_id"]] = deque(maxlen=10)
 
     def initSpotify(self):
         scope = 'playlist-modify-public'
@@ -28,11 +38,23 @@ class RadioSaver:
         self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=self.token)
 
     def processMusic(self):
+        allAddedTracksArray = {}
+
         for station in stations:
             self.saveForStation(station)
 
+            # Save the history in case the server is restarted
+            # Has to be transformed to a normal array since deque isn't JSON serializable
+            station_id = station["station_id"]
+            allAddedTracksArray[station_id] = list(self.allAddedTracks[station_id])
+
+        with open(HISTORY_FILE, 'w') as file:
+            json.dump(allAddedTracksArray, file)
+
+
     def saveForStation(self, station):
         print("Will sync for station: {}\n".format(station["name"]))
+
         # Station specific variables
         station_id = station["station_id"]
         playlist_id = station["playlist_id"]
@@ -100,11 +122,11 @@ class RadioSaver:
         return tracks
 
 ## Main
-scraper = RadioSaver()
-scraper.initSpotify()
-scraper.processMusic()
+saver = RadioSaver()
+saver.initSpotify()
+saver.processMusic()
 
-schedule.every(3).minutes.do(scraper.processMusic)
+schedule.every(3).minutes.do(saver.processMusic)
 
 while True:
     schedule.run_pending()
