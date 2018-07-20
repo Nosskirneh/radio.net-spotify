@@ -15,7 +15,7 @@ Not having the option to host an instance yourself? Open an issue and I can add 
 3. Refresh and look for the `nowplaying?` call. Select `Params`.
 4. Copy the `station` value to the station's dictionary in `config.py`. The `apikey` seems to be the same for every radio station and is thus hardcoded into the saver.
 5. For each radio station you would like to save, create a new Spotify playlist. Copy its Spotify URI within Spotify and store it into the `playlist_id` field.
-6. Also enter the `name` of the station and the `limit` of how many tracks to save in the playlist. Some radio stations, such as Antenne Bayern Classic Rock, have their ads as the track name. Entering the exact name will thus filter these out.
+6. Also enter the `station_name` of the station and the `limit` of how many tracks to save in the playlist. Some radio stations, such as Antenne Bayern Classic Rock, have their ads as the track name. Entering the exact name will thus filter these out.
 
 ### Create a Spotify application (required for API access)
 1. Create a Spotify application at https://developer.spotify.com/my-applications/

@@ -18,18 +18,18 @@ HISTORY_FILE = 'history.json'
 
 class RadioSaver:
     # Store the last ten tracks for each station, to prevent adding the same track over and over
-    allAddedTracks = {}
+    all_added_tracks = {}
     if exists(HISTORY_FILE):
         with open(HISTORY_FILE, 'r') as file:
-            allAddedTracks = json.load(file)
+            all_added_tracks = json.load(file)
             for station in stations: # Transfer the JSON data to deques
                 station_id = station["station_id"]
-                allAddedTracks[station_id] = deque(allAddedTracks[str(station_id)], maxlen=10)
+                all_added_tracks[station_id] = deque(all_added_tracks[str(station_id)], maxlen=10)
     else:
         for station in stations:
-            allAddedTracks[station["station_id"]] = deque(maxlen=10)
+            all_added_tracks[station["station_id"]] = deque(maxlen=10)
 
-    def initSpotify(self):
+    def init_spotify(self):
         scope = 'playlist-modify-public'
         redirect_uri = 'http://localhost:8888/callback/'
         client_credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID,
@@ -37,31 +37,32 @@ class RadioSaver:
         self.token = util.prompt_for_user_token(USERNAME, scope, client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=redirect_uri)
         self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=self.token)
 
-    def processMusic(self):
-        allAddedTracksArray = {}
+    def process_music(self):
+        all_added_tracks_array = {}
 
         for station in stations:
-            self.saveForStation(station)
+            self.save_for_station(station)
 
             # Save the history in case the server is restarted
             # Has to be transformed to a normal array since deque isn't JSON serializable
             station_id = station["station_id"]
-            allAddedTracksArray[station_id] = list(self.allAddedTracks[station_id])
+            all_added_tracks_array[station_id] = list(self.all_added_tracks[station_id])
 
         with open(HISTORY_FILE, 'w') as file:
-            json.dump(allAddedTracksArray, file)
+            json.dump(all_added_tracks_array, file)
 
 
-    def saveForStation(self, station):
-        print("Will sync for station: {}\n".format(station["name"]))
-
+    def save_for_station(self, station):
         # Station specific variables
+        station_name = station["station_name"]
+        print("Will sync for station: {}\n".format(station_name))
+
         station_id = station["station_id"]
         playlist_id = station["playlist_id"]
-        name = station["name"]
         limit = station["limit"]
-        addedTracks = self.allAddedTracks[station_id]
+        processed_tracks = self.all_added_tracks[station_id]
 
+        # Fetch recently played tracks
         url = 'https://api.radio.net/info/v2/search/nowplaying'
         post_fields = {'apikey': 'df5cadfe49eeaff53727bad8c69b47bdf4519123',
                        'numberoftitles': 10,
@@ -71,17 +72,17 @@ class RadioSaver:
         resp = urlopen(request).read().decode()
         tracks = json.loads(resp)
 
-        tracksToAdd = []
+        tracks_to_add = []
         for track in reversed(tracks):
-            trackName = track["streamTitle"];
+            track_name = track["streamTitle"];
             # Some radio stations, such as Antenne Bayern Classic Rock, have their ads as the track name
-            if trackName and name != trackName:
-                if trackName not in addedTracks:
-                    tracksToAdd.append(trackName)
+            if track_name and station_name != track_name:
+                if track_name not in processed_tracks:
+                    tracks_to_add.append(track_name)
 
         # Get Spotify track URIs
-        trackURIs = []
-        for track in tracksToAdd:
+        track_uris = []
+        for track in tracks_to_add:
             print("Will search for track: ", track)
             res = self.spotify.search(q=track, type='track')
             tracks = res["tracks"]
@@ -92,24 +93,23 @@ class RadioSaver:
             item = tracks["items"][0]
             print("Will add track: {} ({})\n".format(item["name"], item["uri"]))
 
-            trackURIs.append(item["uri"])
-            addedTracks.append(track)
+            track_uris.append(item["uri"])
 
-        if trackURIs:
+        if track_uris:
             # Add tracks to playlist
-            self.spotify.user_playlist_add_tracks(USERNAME, playlist_id, trackURIs)
+            self.spotify.user_playlist_add_tracks(USERNAME, playlist_id, track_uris)
 
             # Remove any tracks overflowing the total 400 count
             tracks = self.get_playlist_tracks(playlist_id)
-            tracksToRemove = []
+            tracks_to_remove = []
             if len(tracks) > limit:
                 for i in range(len(tracks) - limit):
-                    # Add the trackURIs for the tracks to be removed, along with their positions
+                    # Add the track_uris for the tracks to be removed, along with their positions
                     tr = {"uri": tracks[i]["track"]["uri"],
                           "positions": [i]}
-                    tracksToRemove.append(tr)
+                    tracks_to_remove.append(tr)
 
-                self.spotify.user_playlist_remove_specific_occurrences_of_tracks(USERNAME, playlist_id, tracksToRemove)
+                self.spotify.user_playlist_remove_specific_occurrences_of_tracks(USERNAME, playlist_id, tracks_to_remove)
 
 
     # Help method to retrieve all tracks of a playlist, as the API only gives 100 at a time
@@ -123,10 +123,10 @@ class RadioSaver:
 
 ## Main
 saver = RadioSaver()
-saver.initSpotify()
-saver.processMusic()
+saver.init_spotify()
+saver.process_music()
 
-schedule.every(3).minutes.do(saver.processMusic)
+schedule.every(3).minutes.do(saver.process_music)
 
 while True:
     schedule.run_pending()
