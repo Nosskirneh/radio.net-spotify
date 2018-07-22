@@ -3,6 +3,7 @@
 from config import *
 import spotipy
 import spotipy.util as util
+from spotipy.client import SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
 import json
 import time
@@ -13,6 +14,7 @@ from urllib.request import Request, urlopen
 import json
 from collections import deque
 from os.path import exists
+from tenacity import *
 
 HISTORY_FILE = 'history.json'
 
@@ -30,12 +32,13 @@ class RadioSaver:
             all_added_tracks[station["station_id"]] = deque(maxlen=10)
 
     def init_spotify(self):
-        scope = 'playlist-modify-public'
-        redirect_uri = 'http://localhost:8888/callback/'
+        self.redirect_uri = 'http://localhost:8888/callback/'
+        self.scope = 'playlist-modify-public'
         client_credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID,
                                                               client_secret=CLIENT_SECRET)
-        self.token = util.prompt_for_user_token(USERNAME, scope, client_id=CLIENT_ID, client_secret=CLIENT_SECRET, redirect_uri=redirect_uri)
-        self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=self.token)
+        token = util.prompt_for_user_token(USERNAME, self.scope, client_id=CLIENT_ID,
+                                           client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
+        self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=token)
 
     def process_music(self):
         all_added_tracks_array = {}
@@ -84,7 +87,7 @@ class RadioSaver:
         track_uris = []
         for track in tracks_to_add:
             print("Will search for track: ", track)
-            res = self.spotify.search(q=track, type='track', limit=1)
+            res = self.search_spotify_track(track)
             tracks = res["tracks"]
 
             processed_tracks.append(track)
@@ -99,7 +102,7 @@ class RadioSaver:
 
         if track_uris:
             # Add tracks to playlist
-            self.spotify.user_playlist_add_tracks(USERNAME, playlist_id, track_uris)
+            self.add_tracks_to_playlist(playlist_id, track_uris)
 
             # Remove any tracks overflowing the total 400 count
             tracks = self.get_playlist_tracks(playlist_id)
@@ -111,7 +114,44 @@ class RadioSaver:
                           "positions": [i]}
                     tracks_to_remove.append(tr)
 
-                self.spotify.user_playlist_remove_specific_occurrences_of_tracks(USERNAME, playlist_id, tracks_to_remove)
+                self.remove_tracks_from_playlist(playlist_id, tracks_to_remove)
+
+    @retry(stop=stop_after_attempt(5))
+    def fetch_station_recently_played(self, station_id):
+        # Fetch recently played tracks
+        url = 'https://api.radio.net/info/v2/search/nowplaying'
+        post_fields = {'apikey': 'df5cadfe49eeaff53727bad8c69b47bdf4519123',
+                       'numberoftitles': 10,
+                       'station': station_id}
+
+        request = Request(url, urlencode(post_fields).encode())
+        resp = urlopen(request).read().decode()
+        return json.loads(resp)
+
+    # Methods that once fail, will refresh the Spotify token and retry the action
+    @retry(reraise=True, stop=stop_after_delay(5))
+    def search_spotify_track(self, track):
+        try:
+            return self.spotify.search(q=track, type='track', limit=5)
+        except SpotifyException:
+            self.refresh_token()
+            pass
+
+    @retry(reraise=True, stop=stop_after_delay(5))
+    def add_tracks_to_playlist(self, playlist_id, track_uris):
+        try:
+            self.spotify.user_playlist_add_tracks(USERNAME, playlist_id, track_uris)
+        except SpotifyException:
+            self.refresh_token()
+            pass
+
+    @retry(reraise=True, stop=stop_after_delay(5))
+    def remove_tracks_from_playlist(self, playlist_id, track_uris):
+        try:
+            self.spotify.user_playlist_remove_specific_occurrences_of_tracks(USERNAME, playlist_id, track_uris)
+        except SpotifyException:
+            self.refresh_token()
+            pass
 
 
     # Help method to retrieve all tracks of a playlist, as the API only gives 100 at a time
@@ -125,10 +165,9 @@ class RadioSaver:
 
     # Method to refresh Spotify token
     def refresh_token(self):
-        cached_token = self.spotify.get_cached_token()
-        refreshed_token = cached_token['refresh_token']
-        new_token = self.spotify.refresh_access_token(refreshed_token)
-        self.spotify = spotipy.Spotify(auth=new_token['access_token'])
+        token = util.prompt_for_user_token(USERNAME, self.scope, client_id=CLIENT_ID,
+                                           client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
+        self.spotify = spotipy.Spotify(auth=token)
 
 ## Main
 saver = RadioSaver()
