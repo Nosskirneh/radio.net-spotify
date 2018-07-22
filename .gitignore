@@ -4,3 +4,4 @@ __pycache__
 .cache*
 history.json
 log.txt
+sftp-config.json
