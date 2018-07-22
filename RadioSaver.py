@@ -5,7 +5,7 @@ import spotipy
 import spotipy.util as util
 from spotipy.oauth2 import SpotifyClientCredentials
 import json
-import schedule, time
+import time
 import sys
 
 from urllib.parse import urlencode
@@ -133,11 +133,7 @@ class RadioSaver:
 ## Main
 saver = RadioSaver()
 saver.init_spotify()
-saver.process_music()
-
-schedule.every(3).minutes.do(saver.process_music)
-schedule.every(59).minutes.do(saver.refresh_token) # Spotify tokens are valid for one hour
 
 while True:
-    schedule.run_pending()
-    time.sleep(1)
+    saver.process_music()
+    time.sleep(180)
