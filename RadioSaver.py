@@ -15,6 +15,9 @@ import json
 from collections import deque
 from os.path import exists
 from tenacity import *
+import difflib
+
+import logging
 
 HISTORY_FILE = 'history.json'
 
@@ -58,47 +61,52 @@ class RadioSaver:
     def save_for_station(self, station):
         # Station specific variables
         station_name = station["station_name"]
-        print("Will sync for station: {}\n".format(station_name))
+        logging.info("Will sync for station: {}\n".format(station_name))
 
         station_id = station["station_id"]
         playlist_id = station["playlist_id"]
         limit = station["limit"]
         processed_tracks = self.all_added_tracks[station_id]
 
-        # Fetch recently played tracks
-        url = 'https://api.radio.net/info/v2/search/nowplaying'
-        post_fields = {'apikey': 'df5cadfe49eeaff53727bad8c69b47bdf4519123',
-                       'numberoftitles': 10,
-                       'station': station_id}
-
-        request = Request(url, urlencode(post_fields).encode())
-        resp = urlopen(request).read().decode()
-        tracks = json.loads(resp)
+        tracks = self.fetch_station_recently_played(station_id)
 
         tracks_to_add = []
         for track in reversed(tracks):
-            track_name = track["streamTitle"];
+            stream_title = track["streamTitle"];
             # Some radio stations, such as Antenne Bayern Classic Rock, have their ads as the track name
-            if track_name and station_name != track_name:
-                if track_name not in processed_tracks:
-                    tracks_to_add.append(track_name)
+            if stream_title and station_name != stream_title:
+                if stream_title not in processed_tracks:
+                    tracks_to_add.append(stream_title)
 
         # Get Spotify track URIs
         track_uris = []
-        for track in tracks_to_add:
-            print("Will search for track: ", track)
-            res = self.search_spotify_track(track)
-            tracks = res["tracks"]
+        for stream_title in tracks_to_add:
+            logging.info("Will search for: {}".format(stream_title))
+            res = self.search_spotify_track(stream_title)
+            searched_tracks = res["tracks"]
 
-            processed_tracks.append(track)
-            if len(tracks["items"]) < 1:
-                print("No tracks found\n")
+            processed_tracks.append(stream_title)
+            if len(searched_tracks["items"]) < 1:
+                logging.info("No tracks found\n")
                 continue
 
-            item = tracks["items"][0]
-            print("Will add track: {} ({})\n".format(item["name"], item["uri"]))
+            # Get the most similar title
+            # This has to be done as it otherwise would have choosen the song "Billie Jean" from the album
+            # "Thriller 25 Super Deluxe Edition" from the search query "Michael Jackson - Thriller"
+            track_names = []
+            for item in searched_tracks["items"]:
+                track_names.append(item["name"])
 
-            track_uris.append(item["uri"])
+            logging.info("Spotify API returned these tracks: {}".format(track_names))
+            track_tile = ' - '.join(stream_title.split(' - ')[1:])
+
+            closest = difflib.get_close_matches(track_tile, track_names, n=1)[0]
+            index = track_names.index(closest)
+            logging.info("Picked index: {} ({}): ".format(index, closest))
+            found_track = searched_tracks["items"][index]
+
+            logging.info("Will add track: {} by {} ({})\n".format(found_track["name"], found_track["artists"][0]["name"], found_track["uri"]))
+            track_uris.append(found_track["uri"])
 
         if track_uris:
             # Add tracks to playlist
@@ -170,6 +178,11 @@ class RadioSaver:
         self.spotify = spotipy.Spotify(auth=token)
 
 ## Main
+# Setup logging
+logging.basicConfig(filename='log.txt', level=logging.INFO, format='%(asctime)s %(message)s') # To file
+logging.getLogger().addHandler(logging.StreamHandler()) # To stdout
+
+# Create saver instance
 saver = RadioSaver()
 saver.init_spotify()
 
