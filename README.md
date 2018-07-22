@@ -9,6 +9,9 @@ Not having the option to host an instance yourself? Open an issue and I can add 
 
 ## Hosting yourself
 
+First install the necessary python plugins:
+`pip install spotipy tenacity logging`
+
 ### Configure radio.net station(s)
 1. Browse the [radio.net](https://radio.net) for your favorite radio station.
 2. Right click and select `Inspect Element`. Tap on the `Network` tab.
@@ -19,6 +22,6 @@ Not having the option to host an instance yourself? Open an issue and I can add 
 
 ### Create a Spotify application (required for API access)
 1. Create a Spotify application at https://developer.spotify.com/my-applications/
-2. Add `http://localhost:8080/callback` as a redirect URL for your app.
+2. Add `http://localhost:8888/callback` as a redirect URL for your app.
 3. Add the `Client ID` and `Client Secret` keys to the `config.py` file.
 4. Once the server has started, you will be redirected to a page. Copy the URL and paste it into the terminal once it asks for it.
