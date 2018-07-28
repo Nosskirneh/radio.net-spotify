@@ -102,9 +102,12 @@ class RadioSaver:
             logging.info("Spotify API returned these tracks: {}".format(track_names))
             track_tile = ' - '.join(stream_title.split(' - ')[1:])
 
-            closest = difflib.get_close_matches(track_tile, track_names, n=1)[0]
-            index = track_names.index(closest)
-            logging.info("Picked index: {} ({}): ".format(index, closest))
+            matches = difflib.get_close_matches(track_tile, track_names, n=1)
+            index = 0 # If no better match is found, use the first track
+            if len(matches) > 0:
+                closest = matches[0]
+                index = track_names.index(closest)
+                logging.info("Picked index: {} ({}): ".format(index, closest))
             found_track = searched_tracks["items"][index]
 
             logging.info("Will add track: {} by {} ({})\n".format(found_track["name"], found_track["artists"][0]["name"], found_track["uri"]))
