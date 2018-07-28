@@ -83,6 +83,8 @@ class RadioSaver:
         for stream_title in tracks_to_add:
             logging.info("Will search for: {}".format(stream_title))
             res = self.search_spotify_track(stream_title)
+            if "tracks" not in res:
+                continue # If response was malformed, try again next search
             searched_tracks = res["tracks"]
 
             processed_tracks.append(stream_title)
