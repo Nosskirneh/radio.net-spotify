@@ -178,13 +178,14 @@ class RadioSaver:
 
     # Method to refresh Spotify token
     def refresh_token(self):
+        logging.info("Refreshing token")
         token = util.prompt_for_user_token(USERNAME, self.scope, client_id=CLIENT_ID,
                                            client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
         self.spotify = spotipy.Spotify(auth=token)
 
 ## Main
 # Setup logging
-logging.basicConfig(filename='log.txt', level=logging.INFO, format='%(asctime)s %(message)s') # To file
+logging.basicConfig(filename='log.txt', level=logging.DEBUG, format='%(asctime)s %(message)s') # To file
 logging.getLogger().addHandler(logging.StreamHandler()) # To stdout
 
 # Create saver instance
