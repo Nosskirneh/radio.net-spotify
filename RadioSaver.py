@@ -129,7 +129,7 @@ class RadioSaver:
 
                 self.remove_tracks_from_playlist(playlist_id, tracks_to_remove)
 
-    @retry(stop=stop_after_attempt(5))
+    @retry
     def fetch_station_recently_played(self, station_id):
         # Fetch recently played tracks
         url = 'https://api.radio.net/info/v2/search/nowplaying'
