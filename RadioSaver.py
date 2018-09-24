@@ -19,6 +19,8 @@ import difflib
 
 import logging
 
+from bs4 import BeautifulSoup
+
 HISTORY_FILE = 'history.json'
 
 class RadioSaver:
@@ -42,6 +44,12 @@ class RadioSaver:
         token = util.prompt_for_user_token(USERNAME, self.scope, client_id=CLIENT_ID,
                                            client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
         self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=token)
+
+    def fetch_radio_api_key(self):
+        html = urlopen("https://radio.net")
+        soup = BeautifulSoup(html.read(), 'lxml');
+        css_url = soup.find("link", rel="stylesheet", type="text/css")['href']
+        self.radio_api_key = css_url.split('=')[1];
 
     def process_music(self):
         all_added_tracks_array = {}
@@ -133,7 +141,7 @@ class RadioSaver:
     def fetch_station_recently_played(self, station_id):
         # Fetch recently played tracks
         url = 'https://api.radio.net/info/v2/search/nowplaying'
-        post_fields = {'apikey': 'c05c45abe841479b7e63392cf824fac373c3f7b0',
+        post_fields = {'apikey': self.radio_api_key,
                        'numberoftitles': 10,
                        'station': station_id}
 
@@ -190,6 +198,7 @@ logging.getLogger().addHandler(logging.StreamHandler()) # To stdout
 
 # Create saver instance
 saver = RadioSaver()
+saver.fetch_radio_api_key()
 saver.init_spotify()
 
 while True:
