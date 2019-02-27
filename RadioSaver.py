@@ -32,6 +32,10 @@ class RadioSaver:
             all_added_tracks_temp = json.load(file)
             for station in stations: # Convert the JSON data to deques
                 station_id = station["station_id"]
+                if (str(station_id) not in all_added_tracks_temp):
+                    all_added_tracks[station_id] = deque(maxlen=10)
+                    continue
+
                 all_added_tracks[station_id] = deque(all_added_tracks_temp[str(station_id)], maxlen=10)
     else:
         for station in stations:
