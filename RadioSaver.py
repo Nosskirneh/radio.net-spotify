@@ -28,10 +28,10 @@ class RadioSaver:
     all_added_tracks = {}
     if exists(HISTORY_FILE):
         with open(HISTORY_FILE, 'r') as file:
-            all_added_tracks = json.load(file)
+            all_added_tracks_temp = json.load(file)
             for station in stations: # Convert the JSON data to deques
                 station_id = station["station_id"]
-                all_added_tracks[station_id] = deque(all_added_tracks[str(station_id)], maxlen=10)
+                all_added_tracks[station_id] = deque(all_added_tracks_temp[str(station_id)], maxlen=10)
     else:
         for station in stations:
             all_added_tracks[station["station_id"]] = deque(maxlen=10)
