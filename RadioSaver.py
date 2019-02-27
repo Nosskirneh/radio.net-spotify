@@ -18,6 +18,7 @@ from tenacity import *
 import difflib
 
 import logging
+from logging.handlers import RotatingFileHandler
 
 from bs4 import BeautifulSoup
 
@@ -36,6 +37,11 @@ class RadioSaver:
         for station in stations:
             all_added_tracks[station["station_id"]] = deque(maxlen=10)
 
+    def __init__(self):
+        self.init_logging()
+        self.fetch_radio_api_key()
+        self.init_spotify()
+
     def init_spotify(self):
         self.redirect_uri = 'http://localhost:8888/callback/'
         self.scope = 'playlist-modify-public'
@@ -44,6 +50,23 @@ class RadioSaver:
         token = util.prompt_for_user_token(USERNAME, self.scope, client_id=CLIENT_ID,
                                            client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
         self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=token)
+
+    def init_logging(self):
+        log_level = logging.DEBUG
+        log_filename = 'log.txt'
+        self.logger = logging.getLogger('root')
+        self.logger.setLevel(log_level)
+        formatter = logging.Formatter('%(asctime)s [%(levelname)s]: %(message)s')
+
+        file_handler = RotatingFileHandler(log_filename, mode='a', maxBytes=50 * 1024, backupCount=2)
+        file_handler.setLevel(log_level)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(log_level)
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler) 
 
     def fetch_radio_api_key(self):
         html = urlopen("https://radio.net")
@@ -65,11 +88,10 @@ class RadioSaver:
         with open(HISTORY_FILE, 'w') as file:
             json.dump(all_added_tracks_array, file)
 
-
     def save_for_station(self, station):
         # Station specific variables
         station_name = station["station_name"]
-        logging.info("Will sync for station: {}\n".format(station_name))
+        self.logger.info("Will sync for station: {}\n".format(station_name))
 
         station_id = station["station_id"]
         playlist_id = station["playlist_id"]
@@ -89,7 +111,7 @@ class RadioSaver:
         # Get Spotify track URIs
         track_uris = []
         for stream_title in tracks_to_add:
-            logging.info("Will search for: {}".format(stream_title))
+            self.logger.info("Will search for: {}".format(stream_title))
             res = self.search_spotify_track(stream_title)
             if res == None or "tracks" not in res:
                 continue # If response was malformed, try again next search
@@ -97,7 +119,7 @@ class RadioSaver:
 
             processed_tracks.append(stream_title)
             if len(searched_tracks["items"]) < 1:
-                logging.info("No tracks found\n")
+                self.logger.info("No tracks found\n")
                 continue
 
             # Get the most similar title
@@ -107,7 +129,7 @@ class RadioSaver:
             for item in searched_tracks["items"]:
                 track_names.append(item["name"])
 
-            logging.info("Spotify API returned these tracks: {}".format(track_names))
+            self.logger.info("Spotify API returned these tracks: {}".format(track_names))
             track_tile = ' - '.join(stream_title.split(' - ')[1:])
 
             matches = difflib.get_close_matches(track_tile, track_names, n=1)
@@ -115,10 +137,10 @@ class RadioSaver:
             if len(matches) > 0:
                 closest = matches[0]
                 index = track_names.index(closest)
-                logging.info("Picked index: {} ({}): ".format(index, closest))
+                self.logger.info("Picked index: {} ({}): ".format(index, closest))
             found_track = searched_tracks["items"][index]
 
-            logging.info("Will add track: {} by {} ({})\n".format(found_track["name"], found_track["artists"][0]["name"], found_track["uri"]))
+            self.logger.info("Will add track: {} by {} ({})\n".format(found_track["name"], found_track["artists"][0]["name"], found_track["uri"]))
             track_uris.append(found_track["uri"])
 
         if track_uris:
@@ -174,7 +196,6 @@ class RadioSaver:
             self.refresh_token()
             pass
 
-
     # Help method to retrieve all tracks of a playlist, as the API only gives 100 at a time
     def get_playlist_tracks(self, playlist_id):
         results = self.spotify.user_playlist_tracks(USERNAME, playlist_id)
@@ -186,20 +207,14 @@ class RadioSaver:
 
     # Method to refresh Spotify token
     def refresh_token(self):
-        logging.info("Refreshing token")
+        self.logger.info("Refreshing token")
         token = util.prompt_for_user_token(USERNAME, self.scope, client_id=CLIENT_ID,
                                            client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
         self.spotify = spotipy.Spotify(auth=token)
 
-## Main
-# Setup logging
-logging.basicConfig(filename='log.txt', level=logging.DEBUG, format='%(asctime)s %(message)s') # To file
-logging.getLogger().addHandler(logging.StreamHandler()) # To stdout
 
-# Create saver instance
+## Main
 saver = RadioSaver()
-saver.fetch_radio_api_key()
-saver.init_spotify()
 
 while True:
     saver.process_music()
