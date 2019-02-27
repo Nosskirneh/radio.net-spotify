@@ -46,15 +46,6 @@ class RadioSaver:
         self.fetch_radio_api_key()
         self.init_spotify()
 
-    def init_spotify(self):
-        self.redirect_uri = 'http://localhost:8888/callback/'
-        self.scope = 'playlist-modify-public'
-        client_credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID,
-                                                              client_secret=CLIENT_SECRET)
-        token = util.prompt_for_user_token(USERNAME, self.scope, client_id=CLIENT_ID,
-                                           client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
-        self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=token)
-
     def init_logging(self):
         log_level = logging.DEBUG
         log_filename = 'log.txt'
@@ -62,7 +53,7 @@ class RadioSaver:
         self.logger.setLevel(log_level)
         formatter = logging.Formatter('%(asctime)s [%(levelname)s]: %(message)s')
 
-        file_handler = RotatingFileHandler(log_filename, mode='a', maxBytes=50 * 1024, backupCount=2)
+        file_handler = RotatingFileHandler(log_filename, mode='a', maxBytes=50 * 1024, backupCount=2, encoding='utf-8')
         file_handler.setLevel(log_level)
         file_handler.setFormatter(formatter)
         self.logger.addHandler(file_handler)
@@ -71,6 +62,15 @@ class RadioSaver:
         console_handler.setLevel(log_level)
         console_handler.setFormatter(formatter)
         self.logger.addHandler(console_handler) 
+
+    def init_spotify(self):
+        self.redirect_uri = 'http://localhost:8888/callback/'
+        self.scope = 'playlist-modify-public'
+        client_credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID,
+                                                              client_secret=CLIENT_SECRET)
+        token = util.prompt_for_user_token(USERNAME, self.scope, client_id=CLIENT_ID,
+                                           client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
+        self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=token)
 
     def fetch_radio_api_key(self):
         html = urlopen("https://radio.net")
