@@ -27,19 +27,20 @@ HISTORY_FILE = 'history.json'
 class RadioSaver:
     # Store the last ten tracks for each station, to prevent adding the same track over and over
     all_added_tracks = {}
+    all_added_tracks_array = {}
+
     if exists(HISTORY_FILE):
         with open(HISTORY_FILE, 'r') as file:
             all_added_tracks_temp = json.load(file)
-            for station in stations: # Convert the JSON data to deques
-                station_id = station["station_id"]
+            for station_id, station in stations.items(): # Convert the JSON data to deques
                 if (str(station_id) not in all_added_tracks_temp):
                     all_added_tracks[station_id] = deque(maxlen=10)
                     continue
 
                 all_added_tracks[station_id] = deque(all_added_tracks_temp[str(station_id)], maxlen=10)
     else:
-        for station in stations:
-            all_added_tracks[station["station_id"]] = deque(maxlen=10)
+        for station_id in stations.keys():
+            all_added_tracks[station_id] = deque(maxlen=10)
 
     def __init__(self):
         self.init_logging()
@@ -79,38 +80,49 @@ class RadioSaver:
         self.radio_api_key = css_url.split('=')[1];
 
     def process_music(self):
-        all_added_tracks_array = {}
+        station_ids = []
+        for station_id in stations.keys():
+            station_ids.append(station_id)
 
-        for station in stations:
-            self.save_for_station(station)
+        self.fetch_stations_history(station_ids)
+
+        with open(HISTORY_FILE, 'w') as file:
+            json.dump(self.all_added_tracks_array, file)
+        self.logger.info("Done processing history for now...")
+
+    def fetch_stations_history(self, station_ids):
+        self.logger.info("Will fetch history...")
+
+        tracks_by_station = self.fetch_stations_recently_played(station_ids)
+        self.logger.debug("Received data: {}".format(json.dumps(tracks_by_station, indent=4, sort_keys=False)))
+        for station_id, response_station in tracks_by_station.items():
+            int_station_id = int(station_id)
+            self.save_for_station(response_station, stations[int_station_id], self.all_added_tracks[int_station_id])
 
             # Save the history in case the server is restarted
             # Has to be transformed to a normal array since deque isn't JSON serializable
-            station_id = station["station_id"]
-            all_added_tracks_array[station_id] = list(self.all_added_tracks[station_id])
+            self.all_added_tracks_array[station_id] = list(self.all_added_tracks[int_station_id])
 
-        with open(HISTORY_FILE, 'w') as file:
-            json.dump(all_added_tracks_array, file)
 
-    def save_for_station(self, station):
+    def save_for_station(self, response_station, station, processed_tracks):
         # Station specific variables
         station_name = station["station_name"]
         self.logger.info("Will sync for station: {}\n".format(station_name))
 
-        station_id = station["station_id"]
         playlist_id = station["playlist_id"]
         limit = station["limit"]
-        processed_tracks = self.all_added_tracks[station_id]
-
-        tracks = self.fetch_station_recently_played(station_id)
 
         tracks_to_add = []
-        for track in reversed(tracks):
+        for track in reversed(response_station):
             stream_title = track["streamTitle"];
             # Some radio stations, such as Antenne Bayern Classic Rock, have their ads as the track name
             if stream_title and station_name != stream_title:
                 if stream_title not in processed_tracks:
                     tracks_to_add.append(stream_title)
+
+        if len(tracks_to_add) == 0:
+            self.logger.info("Found no tracks for station: {}\n".format(station_name))
+            return;
 
         # Get Spotify track URIs
         track_uris = []
@@ -164,12 +176,13 @@ class RadioSaver:
                 self.remove_tracks_from_playlist(playlist_id, tracks_to_remove)
 
     @retry(stop=stop_after_delay(5), wait=wait_fixed(2))
-    def fetch_station_recently_played(self, station_id):
+    def fetch_stations_recently_played(self, station_ids):
         # Fetch recently played tracks
-        url = 'https://api.radio.net/info/v2/search/nowplaying'
+        url = 'https://api.radio.net/info/v2/search/nowplayingbystations'
         post_fields = {'apikey': self.radio_api_key,
-                       'numberoftitles': 10,
-                       'station': station_id}
+                       'numberoftitles': 3,
+                       'stations': ','.join([str(i) for i in station_ids])}
+        self.logger.debug("Will query URL: {}, fields: {}".format(url, post_fields))
 
         request = Request(url, urlencode(post_fields).encode())
         resp = urlopen(request).read().decode()
