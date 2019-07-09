@@ -175,7 +175,7 @@ class RadioSaver:
 
                 self.remove_tracks_from_playlist(playlist_uri, tracks_to_remove)
 
-    @retry(stop=stop_after_delay(5), wait=wait_fixed(2))
+    @retry(stop=stop_after_delay(4), wait=wait_fixed(15))
     def fetch_stations_recently_played(self, station_ids):
         # Fetch recently played tracks
         url = 'https://api.radio.net/info/v2/search/nowplayingbystations'
@@ -189,7 +189,7 @@ class RadioSaver:
         return json.loads(resp)
 
     # Methods that once fail, will refresh the Spotify token and retry the action
-    @retry(reraise=True, stop=stop_after_delay(5), wait=wait_fixed(2))
+    @retry(reraise=True, stop=stop_after_delay(4), wait=wait_fixed(15))
     def search_spotify_track(self, track):
         try:
             return self.spotify.search(q=track, type='track', limit=5)
@@ -197,7 +197,7 @@ class RadioSaver:
             self.refresh_token()
             pass
 
-    @retry(reraise=True, stop=stop_after_delay(5), wait=wait_fixed(2))
+    @retry(reraise=True, stop=stop_after_delay(4), wait=wait_fixed(15))
     def add_tracks_to_playlist(self, playlist_uri, track_uris):
         try:
             self.spotify.user_playlist_add_tracks(USERNAME, playlist_uri, track_uris)
@@ -205,7 +205,7 @@ class RadioSaver:
             self.refresh_token()
             pass
 
-    @retry(reraise=True, stop=stop_after_delay(5), wait=wait_fixed(2))
+    @retry(reraise=True, stop=stop_after_delay(4), wait=wait_fixed(15))
     def remove_tracks_from_playlist(self, playlist_uri, track_uris):
         try:
             self.spotify.user_playlist_remove_specific_occurrences_of_tracks(USERNAME, playlist_uri, track_uris)
