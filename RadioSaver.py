@@ -48,7 +48,7 @@ class RadioSaver:
         self.init_spotify()
 
     def init_logging(self):
-        log_level = logging.DEBUG
+        log_level = logging.INFO
         log_filename = 'log.txt'
         self.logger = logging.getLogger('root')
         self.logger.setLevel(log_level)
