@@ -109,7 +109,7 @@ class RadioSaver:
         station_name = station["station_name"]
         self.logger.info("Will sync for station: {}\n".format(station_name))
 
-        playlist_id = station["playlist_id"]
+        playlist_uri = station["playlist_uri"]
         limit = station["limit"]
 
         tracks_to_add = []
@@ -161,10 +161,10 @@ class RadioSaver:
 
         if track_uris:
             # Add tracks to playlist
-            self.add_tracks_to_playlist(playlist_id, track_uris)
+            self.add_tracks_to_playlist(playlist_uri, track_uris)
 
             # Remove any tracks overflowing the total 400 count
-            tracks = self.get_playlist_tracks(playlist_id)
+            tracks = self.get_playlist_tracks(playlist_uri)
             tracks_to_remove = []
             if len(tracks) > limit:
                 for i in range(len(tracks) - limit):
@@ -173,7 +173,7 @@ class RadioSaver:
                           "positions": [i]}
                     tracks_to_remove.append(tr)
 
-                self.remove_tracks_from_playlist(playlist_id, tracks_to_remove)
+                self.remove_tracks_from_playlist(playlist_uri, tracks_to_remove)
 
     @retry(stop=stop_after_delay(5), wait=wait_fixed(2))
     def fetch_stations_recently_played(self, station_ids):
@@ -198,24 +198,24 @@ class RadioSaver:
             pass
 
     @retry(reraise=True, stop=stop_after_delay(5), wait=wait_fixed(2))
-    def add_tracks_to_playlist(self, playlist_id, track_uris):
+    def add_tracks_to_playlist(self, playlist_uri, track_uris):
         try:
-            self.spotify.user_playlist_add_tracks(USERNAME, playlist_id, track_uris)
+            self.spotify.user_playlist_add_tracks(USERNAME, playlist_uri, track_uris)
         except SpotifyException:
             self.refresh_token()
             pass
 
     @retry(reraise=True, stop=stop_after_delay(5), wait=wait_fixed(2))
-    def remove_tracks_from_playlist(self, playlist_id, track_uris):
+    def remove_tracks_from_playlist(self, playlist_uri, track_uris):
         try:
-            self.spotify.user_playlist_remove_specific_occurrences_of_tracks(USERNAME, playlist_id, track_uris)
+            self.spotify.user_playlist_remove_specific_occurrences_of_tracks(USERNAME, playlist_uri, track_uris)
         except SpotifyException:
             self.refresh_token()
             pass
 
     # Help method to retrieve all tracks of a playlist, as the API only gives 100 at a time
-    def get_playlist_tracks(self, playlist_id):
-        results = self.spotify.user_playlist_tracks(USERNAME, playlist_id)
+    def get_playlist_tracks(self, playlist_uri):
+        results = self.spotify.user_playlist_tracks(USERNAME, playlist_uri)
         tracks = results['items']
         while results['next']:
             results = self.spotify.next(results)
