@@ -62,7 +62,7 @@ class RadioSaver:
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(log_level)
         console_handler.setFormatter(formatter)
-        self.logger.addHandler(console_handler) 
+        self.logger.addHandler(console_handler)
 
     def init_spotify(self):
         self.redirect_uri = 'http://localhost:8888/callback/'
@@ -74,10 +74,26 @@ class RadioSaver:
         self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=token)
 
     def fetch_radio_api_key(self):
-        html = urlopen("https://radio.net")
-        soup = BeautifulSoup(html.read(), 'lxml');
-        css_url = soup.find("link", rel="stylesheet", type="text/css")['href']
-        self.radio_api_key = css_url.split('=')[1];
+        url = "https://radio.net"
+        hdr = {'User-Agent': 'Mozilla/5.0'}
+        req = Request(url, headers=hdr)
+        page = urlopen(req)
+        soup = BeautifulSoup(page, 'lxml')
+        scripts = soup.findAll("script")
+
+        for script in scripts:
+            if (len(script.contents) <= 0):
+                continue
+
+            content = script.contents[0];
+            if "https://api.radio.net" in content:
+                search_term = "apiKey: '"
+                pos = content.rfind(search_term)
+                start_pos = pos + len(search_term)
+                self.radio_api_key = content[start_pos:start_pos + 40]
+                return
+
+        sys.exit("Could not find an API key to radio.net")
 
     def process_music(self):
         station_ids = []
@@ -114,7 +130,7 @@ class RadioSaver:
 
         tracks_to_add = []
         for track in reversed(response_station):
-            stream_title = track["streamTitle"];
+            stream_title = track["streamTitle"]
             # Some radio stations, such as Antenne Bayern Classic Rock, have their ads as the track name
             if stream_title and station_name != stream_title:
                 if stream_title not in processed_tracks:
@@ -122,7 +138,7 @@ class RadioSaver:
 
         if len(tracks_to_add) == 0:
             self.logger.info("Found no tracks for station: {}\n".format(station_name))
-            return;
+            return
 
         # Get Spotify track URIs
         track_uris = []
