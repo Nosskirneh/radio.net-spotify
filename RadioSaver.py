@@ -113,14 +113,22 @@ class RadioSaver:
         self.logger.debug("Received data: {}".format(json.dumps(tracks_by_station, indent=4, sort_keys=False)))
         for station_id, response_station in tracks_by_station.items():
             int_station_id = int(station_id)
-            self.save_for_station(response_station, stations[int_station_id], self.all_added_tracks[int_station_id])
+            processed_tracks = self.all_added_tracks[int_station_id]
+            search_titles = self.titles_for_station(response_station, stations[int_station_id], processed_tracks)
+
+            if len(search_titles) == 0:
+                self.logger.info("Found no tracks for station: {}\n".format(station_name))
+                continue
+
+            # Get Spotify track URIs
+            self.search_and_add_spotify_tracks(search_titles, processed_tracks)
 
             # Save the history in case the server is restarted
             # Has to be transformed to a normal array since deque isn't JSON serializable
             self.all_added_tracks_array[station_id] = list(self.all_added_tracks[int_station_id])
 
 
-    def save_for_station(self, response_station, station, processed_tracks):
+    def titles_for_station(self, response_station, station, processed_tracks):
         # Station specific variables
         station_name = station["station_name"]
         self.logger.info("Will sync for station: {}\n".format(station_name))
@@ -128,21 +136,18 @@ class RadioSaver:
         playlist_uri = station["playlist_uri"]
         limit = station["limit"]
 
-        tracks_to_add = []
+        search_titles = []
         for track in reversed(response_station):
             stream_title = track["streamTitle"]
             # Some radio stations, such as Antenne Bayern Classic Rock, have their ads as the track name
-            if stream_title and station_name != stream_title:
-                if stream_title not in processed_tracks:
-                    tracks_to_add.append(stream_title)
+            if stream_title and station_name != stream_title and stream_title not in processed_tracks:
+                search_titles.append(stream_title)
+        
+        return search_titles
 
-        if len(tracks_to_add) == 0:
-            self.logger.info("Found no tracks for station: {}\n".format(station_name))
-            return
-
-        # Get Spotify track URIs
+    def search_and_add_spotify_tracks(self, search_titles, processed_tracks):
         track_uris = []
-        for stream_title in tracks_to_add:
+        for stream_title in search_titles:
             self.logger.info("Will search for: {}".format(stream_title))
             res = self.search_spotify_track(stream_title)
             if res == None or "tracks" not in res:
