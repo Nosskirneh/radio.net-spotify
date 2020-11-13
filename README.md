@@ -29,6 +29,9 @@ First install the necessary python plugins:
 5. For each radio station you would like to save, create a new Spotify playlist. Copy its Spotify URI within Spotify and store it into the `playlist_uri` field.
 6. Also enter the `station_name` of the station and the `limit` of how many tracks to save in the playlist. Some radio stations, such as [Antenne Bayern Classic Rock](http://antenneclassicrock.radio.net/), have their ads as the track name. Entering the exact name will thus filter these out.
 
+### Other endpoints
+RadioPlay and ILikeRadio are also supported. Finding the respective station ID can be done in similar fashion as for radio.net.
+
 ### Create a Spotify application (required for API access)
 1. Create a Spotify application at https://developer.spotify.com/my-applications/
 2. Add `http://localhost:8888/callback` as a redirect URL for your app.
@@ -45,7 +48,7 @@ After=syslog.target network.target
 
 [Service]
 WorkingDirectory=/srv/radio.net-spotify/
-ExecStart=/srv/radio.net-spotify/RadioSaver.py
+ExecStart=/srv/radio.net-spotify/main.py
 Restart=always
 User=radionet
 
