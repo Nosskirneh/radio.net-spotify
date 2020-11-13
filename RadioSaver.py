@@ -1,26 +1,21 @@
-#!/usr/bin/env python3
-
 from config import *
 import spotipy
 import spotipy.util as util
 from spotipy.client import SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
 import json
-import time
 import sys
+from tenacity import *
+from RadioNet import RadioNet
+from RadioPlay import RadioPlay
+from ILikeRadio import ILikeRadio
 
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
-import json
 from collections import deque
 from os.path import exists
-from tenacity import *
 import difflib
 
 import logging
 from logging.handlers import RotatingFileHandler
-
-from bs4 import BeautifulSoup
 
 HISTORY_FILE = 'history.json'
 
@@ -28,6 +23,9 @@ class RadioSaver:
     # Store the last ten tracks for each station, to prevent adding the same track over and over
     all_added_tracks = {}
     all_added_tracks_array = {}
+    stations = {}
+    for stations_list in [radio_net_stations, radio_play_stations, ilikeradio_stations]:
+        stations.update(stations_list)
 
     if exists(HISTORY_FILE):
         with open(HISTORY_FILE, 'r') as file:
@@ -37,15 +35,17 @@ class RadioSaver:
                     all_added_tracks[station_id] = deque(maxlen=10)
                     continue
 
-                all_added_tracks[station_id] = deque(all_added_tracks_temp[str(station_id)], maxlen=10)
+                all_added_tracks[station_id] = deque(all_added_tracks_temp[station_id], maxlen=10)
     else:
         for station_id in stations.keys():
             all_added_tracks[station_id] = deque(maxlen=10)
 
     def __init__(self):
         self.init_logging()
-        self.fetch_radio_api_key()
         self.init_spotify()
+        self.radio_net = RadioNet(self.logger)
+        self.radio_play = RadioPlay(self.logger)
+        self.ilikeradio = ILikeRadio(self.logger)
 
     def init_logging(self):
         log_level = logging.INFO
@@ -73,79 +73,45 @@ class RadioSaver:
                                            client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
         self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager, auth=token)
 
-    def fetch_radio_api_key(self):
-        url = "https://radio.net"
-        hdr = {'User-Agent': 'Mozilla/5.0'}
-        req = Request(url, headers=hdr)
-        page = urlopen(req)
-        soup = BeautifulSoup(page, 'lxml')
-        scripts = soup.findAll("script")
-
-        for script in scripts:
-            if (len(script.contents) <= 0):
-                continue
-
-            content = script.contents[0];
-            if "https://api.radio.net" in content:
-                search_term = "apiKey: '"
-                pos = content.rfind(search_term)
-                start_pos = pos + len(search_term)
-                self.radio_api_key = content[start_pos:start_pos + 40]
-                return
-
-        sys.exit("Could not find an API key to radio.net")
-
     def process_music(self):
-        station_ids = []
-        for station_id in stations.keys():
-            station_ids.append(station_id)
-
-        self.fetch_stations_history(station_ids)
+        self.fetch_stations_history()
 
         with open(HISTORY_FILE, 'w') as file:
             json.dump(self.all_added_tracks_array, file)
         self.logger.info("Done processing history for now...")
 
-    def fetch_stations_history(self, station_ids):
+    def fetch_stations_history(self):
         self.logger.info("Will fetch history...")
+        self.fetch_history_for_endpoint(self.radio_net, radio_net_stations)
+        self.fetch_history_for_endpoint(self.radio_play, radio_play_stations)
+        self.fetch_history_for_endpoint(self.ilikeradio, ilikeradio_stations)
 
-        tracks_by_station = self.fetch_stations_recently_played(station_ids)
-        self.logger.debug("Received data: {}".format(json.dumps(tracks_by_station, indent=4, sort_keys=False)))
-        for station_id, response_station in tracks_by_station.items():
-            int_station_id = int(station_id)
-            processed_tracks = self.all_added_tracks[int_station_id]
-            search_titles = self.titles_for_station(response_station, stations[int_station_id], processed_tracks)
+    def fetch_history_for_endpoint(self, radio_endpoint, stations):
+        station_ids = []
+        for station_id in stations.keys():
+            station_ids.append(station_id)
+
+        response_by_station = radio_endpoint.fetch_stations_recently_played(station_ids)
+        self.logger.debug("Received data: {}".format(json.dumps(response_by_station, indent=4, sort_keys=False)))
+        for station_id, response_station in response_by_station.items():
+            station = stations[station_id]
+            station_name = station["station_name"]
+            processed_tracks = self.all_added_tracks[station_id]
+            self.logger.info("Will sync for station: {}\n".format(station_name))
+            search_titles = radio_endpoint.titles_for_station(response_station, stations[station_id], processed_tracks)
 
             if len(search_titles) == 0:
                 self.logger.info("Found no tracks for station: {}\n".format(station_name))
                 continue
 
             # Get Spotify track URIs
-            self.search_and_add_spotify_tracks(search_titles, processed_tracks)
+            self.search_and_add_spotify_tracks(search_titles, processed_tracks, station["playlist_uri"], station["limit"])
 
             # Save the history in case the server is restarted
             # Has to be transformed to a normal array since deque isn't JSON serializable
-            self.all_added_tracks_array[station_id] = list(self.all_added_tracks[int_station_id])
+            self.all_added_tracks_array[station_id] = list(self.all_added_tracks[station_id])
 
-
-    def titles_for_station(self, response_station, station, processed_tracks):
-        # Station specific variables
-        station_name = station["station_name"]
-        self.logger.info("Will sync for station: {}\n".format(station_name))
-
-        playlist_uri = station["playlist_uri"]
-        limit = station["limit"]
-
-        search_titles = []
-        for track in reversed(response_station):
-            stream_title = track["streamTitle"]
-            # Some radio stations, such as Antenne Bayern Classic Rock, have their ads as the track name
-            if stream_title and station_name != stream_title and stream_title not in processed_tracks:
-                search_titles.append(stream_title)
-        
-        return search_titles
-
-    def search_and_add_spotify_tracks(self, search_titles, processed_tracks):
+    def search_and_add_spotify_tracks(self, search_titles, processed_tracks, playlist_uri, limit):
         track_uris = []
         for stream_title in search_titles:
             self.logger.info("Will search for: {}".format(stream_title))
@@ -196,19 +162,6 @@ class RadioSaver:
 
                 self.remove_tracks_from_playlist(playlist_uri, tracks_to_remove)
 
-    @retry(stop=stop_after_delay(4), wait=wait_fixed(15))
-    def fetch_stations_recently_played(self, station_ids):
-        # Fetch recently played tracks
-        url = 'https://api.radio.net/info/v2/search/nowplayingbystations'
-        post_fields = {'apikey': self.radio_api_key,
-                       'numberoftitles': 3,
-                       'stations': ','.join([str(i) for i in station_ids])}
-        self.logger.debug("Will query URL: {}, fields: {}".format(url, post_fields))
-
-        request = Request(url, urlencode(post_fields).encode())
-        resp = urlopen(request).read().decode()
-        return json.loads(resp)
-
     # Methods that once fail, will refresh the Spotify token and retry the action
     @retry(reraise=True, stop=stop_after_delay(4), wait=wait_fixed(15))
     def search_spotify_track(self, track):
@@ -249,11 +202,3 @@ class RadioSaver:
         token = util.prompt_for_user_token(USERNAME, self.scope, client_id=CLIENT_ID,
                                            client_secret=CLIENT_SECRET, redirect_uri=self.redirect_uri)
         self.spotify = spotipy.Spotify(auth=token)
-
-
-## Main
-saver = RadioSaver()
-
-while True:
-    saver.process_music()
-    time.sleep(180)
