@@ -130,7 +130,9 @@ class RadioSaver:
                 self.logger.info("Picked index: {} ({}): ".format(index, closest))
             found_track = searched_tracks["items"][index]
 
-            self.logger.info("Will add track: {} by {} ({})\n".format(found_track["name"], found_track["artists"][0]["name"], found_track["uri"]))
+            self.logger.info("Will add track: {} by {} ({})\n".format(found_track["name"],
+                                                                      found_track["artists"][0]["name"],
+                                                                      found_track["uri"]))
             track_uris.append(found_track["uri"])
 
         if track_uris:
@@ -139,12 +141,15 @@ class RadioSaver:
 
             # Remove any tracks overflowing the total 400 count
             tracks = self.spotify_handler.get_overflowing_playlist_track_uris(playlist_uri, limit)
-            tracks_to_remove = []
-            if len(tracks) > limit:
-                for i in range(len(tracks) - limit):
-                    # Add the track_uris for the tracks to be removed, along with their positions
-                    tr = {"uri": tracks[i]["track"]["uri"],
-                          "positions": [i]}
-                    tracks_to_remove.append(tr)
+            if len(tracks) == 0:
+                return
 
-                self.spotify_handler.remove_tracks_from_playlist(playlist_uri, tracks_to_remove)
+            tracks_to_remove = []
+            for i, track in enumerate(tracks):
+                # Add the track_uris for the tracks to be removed, along with their positions
+                tracks_to_remove.append({
+                    "uri": track["track"]["uri"],
+                    "positions": [i]
+                })
+
+            self.spotify_handler.remove_tracks_from_playlist(playlist_uri, tracks_to_remove)

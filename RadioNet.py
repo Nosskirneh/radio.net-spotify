@@ -40,7 +40,7 @@ class RadioNet:
             # Some radio stations, such as Antenne Bayern Classic Rock, have their ads as the track name
             if stream_title and station["station_name"] != stream_title and stream_title not in processed_tracks:
                 search_titles.append(stream_title)
-        
+
         return search_titles
 
 
