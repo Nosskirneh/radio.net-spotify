@@ -138,7 +138,7 @@ class RadioSaver:
             self.spotify_handler.add_tracks_to_playlist(playlist_uri, track_uris)
 
             # Remove any tracks overflowing the total 400 count
-            tracks = self.spotify_handler.get_playlist_tracks(playlist_uri)
+            tracks = self.spotify_handler.get_overflowing_playlist_track_uris(playlist_uri, limit)
             tracks_to_remove = []
             if len(tracks) > limit:
                 for i in range(len(tracks) - limit):

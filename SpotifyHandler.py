@@ -48,14 +48,21 @@ class SpotifyHandler:
             self.refresh_connection()
             pass
 
-    # Help method to retrieve all tracks of a playlist, as the API only gives 100 at a time
-    def get_playlist_tracks(self, playlist_uri):
-        results = self.connection.user_playlist_tracks(self.username, playlist_uri)
-        tracks = results['items']
-        while results['next']:
-            results = self.connection.next(results)
-            tracks.extend(results['items'])
-        return tracks
+    def get_overflowing_playlist_track_uris(self, playlist_uri, limit):
+        fields = ["items.track.uri"]
+        def query_tracks(offset, amount):
+            return self.connection.user_playlist_tracks(self.username,
+                                                        playlist_uri,
+                                                        offset=offset,
+                                                        limit=amount,
+                                                        fields=fields)['items']
+        # First we need to query the end of the playlist to see if there's anything overflowing
+        first_tracks = query_tracks(limit + 1, 10)
+        num_overflowing = len(first_tracks)
+        if (num_overflowing == 0):
+            return []
+        # Then we need to query the beginning of the playlist
+        return query_tracks(0, num_overflowing)
 
     def get_token(self):
         return util.prompt_for_user_token(self.username, self.scope, client_id=self.client_id,
