@@ -19,7 +19,7 @@ Not having the option to host an instance yourself? Open an issue and I can add 
 ## Hosting yourself
 
 First install the necessary python plugins:
-`pip3 install spotipy tenacity lxml BeautifulSoup4`
+`pip3 install spotipy tenacity lxml BeautifulSoup4 cachetools`
 
 ### Configure radio.net station(s)
 1. Browse the [radio.net](https://radio.net) for your favorite radio station.
