@@ -3,15 +3,18 @@ import spotipy.util as util
 from spotipy.client import SpotifyException
 from spotipy.oauth2 import SpotifyClientCredentials
 from tenacity import retry, stop_after_delay, wait_fixed
+from SetTTLOnceCache import SetTTLOnceCache
 
 
 class SpotifyHandler:
 
-    def __init__(self, username, client_id, client_secret, logger):
+    def __init__(self, username, client_id, client_secret, num_playlists, logger):
         self.username = username
         self.client_id = client_id
         self.client_secret = client_secret
         self.logger = logger
+        # Only check the number of overflowing tracks once every 12 hours
+        self.overflow_cache = SetTTLOnceCache(maxsize=num_playlists, ttl=3600 * 12)
         self.init_connection()
 
     def init_connection(self):
@@ -36,6 +39,7 @@ class SpotifyHandler:
     def add_tracks_to_playlist(self, playlist_uri, track_uris):
         try:
             self.connection.user_playlist_add_tracks(self.username, playlist_uri, track_uris)
+            self.try_change_overflow_cache(playlist_uri, len(track_uris))
         except SpotifyException:
             self.refresh_connection()
             pass
@@ -44,6 +48,7 @@ class SpotifyHandler:
     def remove_tracks_from_playlist(self, playlist_uri, track_uris):
         try:
             self.connection.user_playlist_remove_specific_occurrences_of_tracks(self.username, playlist_uri, track_uris)
+            self.try_change_overflow_cache(playlist_uri, -len(track_uris))
         except SpotifyException:
             self.refresh_connection()
             pass
@@ -57,11 +62,15 @@ class SpotifyHandler:
                                                         limit=amount,
                                                         fields=fields)['items']
         # First we need to query the end of the playlist to see if there's anything overflowing
-        first_tracks = query_tracks(limit + 1, 10)
-        num_overflowing = len(first_tracks)
+        try:
+            num_overflowing = self.overflow_cache[playlist_uri]
+        except KeyError:
+            num_overflowing = len(query_tracks(limit, 10))
+
         if (num_overflowing == 0):
             return []
         # Then we need to query the beginning of the playlist
+        self.overflow_cache[playlist_uri] = num_overflowing
         return query_tracks(0, num_overflowing)
 
     def get_token(self):
@@ -72,3 +81,7 @@ class SpotifyHandler:
     def refresh_connection(self):
         self.logger.info("Refreshing token")
         self.connection = spotipy.Spotify(auth=self.get_token())
+
+    def try_change_overflow_cache(self, playlist_uri, diff):
+        if playlist_uri in self.overflow_cache:
+            self.overflow_cache[playlist_uri] += diff
