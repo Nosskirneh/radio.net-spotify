@@ -22,12 +22,11 @@ First install the necessary python plugins:
 `pip3 install spotipy tenacity lxml BeautifulSoup4 cachetools`
 
 ### Configure radio.net station(s)
-1. Browse the [radio.net](https://radio.net) for your favorite radio station.
+1. Browse [radio.net](https://radio.net) for your favorite radio station.
 2. Right click and select `Inspect Element`. Tap on the `Network` tab.
-3. Refresh and look for the `nowplaying?` call. Select `Params`.
-4. Copy the `station` value to the key of the station's dictionary in `config.py`. The `apikey` is the same for every radio station and is fetched at launch.
-5. For each radio station you would like to save, create a new Spotify playlist. Copy its Spotify URI within Spotify and store it into the `playlist_uri` field.
-6. Also enter the `station_name` of the station and the `limit` of how many tracks to save in the playlist. Some radio stations, such as [Antenne Bayern Classic Rock](http://antenneclassicrock.radio.net/), have their ads as the track name. Entering the exact name will thus filter these out.
+3. Refresh and look for the first GET request. The ID of the station is the name you see. Copy the station ID to the key of the station's dictionary in `config.py`.
+4. For each radio station you would like to save, create a new Spotify playlist. Copy its Spotify URI within Spotify and store it into the `playlist_uri` field.
+5. Also enter the `station_name` of the station and the `limit` of how many tracks to save in the playlist. Some radio stations, such as [Antenne Bayern Classic Rock](http://antenneclassicrock.radio.net/), have their ads as the track name. Entering the exact name will thus filter these out.
 
 ### Other endpoints
 RadioPlay and ILikeRadio are also supported. Finding the respective station ID can be done in similar fashion as for radio.net.
