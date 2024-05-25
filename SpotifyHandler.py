@@ -54,24 +54,32 @@ class SpotifyHandler:
             pass
 
     def get_overflowing_playlist_track_uris(self, playlist_uri, limit):
-        fields = ["items.track.uri"]
-        def query_tracks(offset, amount):
+        def query_tracks(offset, amount=10, fields=["items.track.uri"]):
             return self.connection.user_playlist_tracks(self.username,
                                                         playlist_uri,
                                                         offset=offset,
                                                         limit=amount,
-                                                        fields=fields)['items']
+                                                        fields=fields)
         # First we need to query the end of the playlist to see if there's anything overflowing
         try:
             num_overflowing = self.overflow_cache[playlist_uri]
         except KeyError:
-            num_overflowing = len(query_tracks(limit, 10))
+            num_overflowing = query_tracks(limit, fields=["total"])["total"] - limit
 
-        if (num_overflowing == 0):
+        if (num_overflowing <= 0):
             return []
         # Then we need to query the beginning of the playlist
+        uris = []
+        page_limit = 100
+        offset = 0
+        remaining = num_overflowing
+        while remaining > 0:
+            next_limit = min(page_limit, remaining)
+            uris.extend(query_tracks(offset, next_limit)['items'])
+            offset += next_limit
+            remaining -= next_limit
         self.overflow_cache[playlist_uri] = num_overflowing
-        return query_tracks(0, num_overflowing)
+        return uris
 
     def get_token(self):
         return util.prompt_for_user_token(self.username, self.scope, client_id=self.client_id,
