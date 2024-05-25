@@ -18,8 +18,15 @@ Not having the option to host an instance yourself? Open an issue and I can add 
 
 ## Hosting yourself
 
-First install the necessary python plugins:
-`pip3 install spotipy tenacity lxml BeautifulSoup4 cachetools`
+Create the following file `.env`:
+```
+USERNAME=<username>
+CLIENT_ID=<client ID>
+CLIENT_SECRET=<client secret>
+```
+
+Build the docker container: `docker build -t radionet-spotify .`
+Run the docker container: `docker run -it --rm --env-file .env -p 8888:8888 radionet-spotify`
 
 ### Configure radio.net station(s)
 1. Browse [radio.net](https://radio.net) for your favorite radio station.
@@ -35,22 +42,4 @@ RadioPlay and ILikeRadio are also supported. Finding the respective station ID c
 1. Create a Spotify application at https://developer.spotify.com/my-applications/
 2. Add `http://localhost:8888/callback` as a redirect URL for your app.
 3. Add the `Client ID` and `Client Secret` keys to the `config.py` file.
-4. Once it has started, you will be redirected to a page. Copy the URL and paste it into the terminal once it asks for it.
-
-### Autostart with Linux
-If you're running a distro of Linux that has systemd, change the directories and users of this below to your liking
-
-```
-[Unit]
-Description=radio.net-spotify
-After=syslog.target network.target
-
-[Service]
-WorkingDirectory=/srv/radio.net-spotify/
-ExecStart=/srv/radio.net-spotify/main.py
-Restart=always
-User=radionet
-
-[Install]
-WantedBy=multi-user.target
-```
+4. Once it has started, you will be redirected to a page. Copy the URL and paste it into the browser once it asks for it.

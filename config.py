@@ -1,7 +1,13 @@
 # Spotify configs
-USERNAME      = ''
-CLIENT_ID     = ''
-CLIENT_SECRET = ''
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
+USERNAME = os.getenv('USERNAME')
+CLIENT_ID = os.getenv('CLIENT_ID')
+CLIENT_SECRET = os.getenv('CLIENT_SECRET')
 
 # Station configs
 radio_net_stations = {
