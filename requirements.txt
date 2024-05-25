@@ -1,0 +1,5 @@
+spotipy
+tenacity
+lxml
+beautifulsoup4
+cachetools
