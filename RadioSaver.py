@@ -38,7 +38,7 @@ class RadioSaver:
 
     def __init__(self):
         self.init_logging()
-        self.spotify_handler = SpotifyHandler(USERNAME, CLIENT_ID, CLIENT_SECRET, len(self.stations), self.logger)
+        self.spotify_handler = SpotifyHandler(CLIENT_ID, CLIENT_SECRET, len(self.stations), self.logger)
         self.radio_net = RadioNet(self.logger)
         self.radio_play = RadioPlay(self.logger)
         self.ilikeradio = ILikeRadio(self.logger)

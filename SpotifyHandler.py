@@ -1,15 +1,14 @@
 import spotipy
 import spotipy.util as util
+from spotipy import SpotifyOAuth
 from spotipy.client import SpotifyException
-from spotipy.oauth2 import SpotifyClientCredentials
 from tenacity import retry, stop_after_delay, wait_fixed
 from SetTTLOnceCache import SetTTLOnceCache
 
 
 class SpotifyHandler:
 
-    def __init__(self, username, client_id, client_secret, num_playlists, logger):
-        self.username = username
+    def __init__(self, client_id, client_secret, num_playlists, logger):
         self.client_id = client_id
         self.client_secret = client_secret
         self.logger = logger
@@ -18,12 +17,14 @@ class SpotifyHandler:
         self.init_connection()
 
     def init_connection(self):
-        self.redirect_uri = 'http://localhost:8888/callback/'
         self.scope = 'playlist-modify-public'
-        client_credentials_manager = SpotifyClientCredentials(client_id=self.client_id,
-                                                              client_secret=self.client_secret)
-        self.connection = spotipy.Spotify(client_credentials_manager=client_credentials_manager,
-                                          auth=self.get_token())
+        self.redirect_uri = 'http://localhost:8888/callback/'
+        self.auth_manager = SpotifyOAuth(scope=self.scope,
+                                         client_id=self.client_id,
+                                         client_secret=self.client_secret,
+                                         redirect_uri=self.redirect_uri,
+                                         open_browser=False)
+        self.connection = spotipy.Spotify(auth_manager=self.auth_manager)
 
 
     # Methods that once fail, will refresh the Spotify token and retry the action
@@ -38,7 +39,7 @@ class SpotifyHandler:
     @retry(reraise=True, stop=stop_after_delay(4), wait=wait_fixed(15))
     def add_tracks_to_playlist(self, playlist_uri, track_uris):
         try:
-            self.connection.user_playlist_add_tracks(self.username, playlist_uri, track_uris)
+            self.connection.playlist_add_items(playlist_uri, track_uris)
             self.try_change_overflow_cache(playlist_uri, len(track_uris))
         except SpotifyException:
             self.refresh_connection()
@@ -47,7 +48,7 @@ class SpotifyHandler:
     @retry(reraise=True, stop=stop_after_delay(4), wait=wait_fixed(15))
     def remove_tracks_from_playlist(self, playlist_uri, track_uris):
         try:
-            self.connection.user_playlist_remove_specific_occurrences_of_tracks(self.username, playlist_uri, track_uris)
+            self.connection.playlist_remove_specific_occurrences_of_items(playlist_uri, track_uris)
             self.try_change_overflow_cache(playlist_uri, -len(track_uris))
         except SpotifyException:
             self.refresh_connection()
@@ -55,11 +56,10 @@ class SpotifyHandler:
 
     def get_overflowing_playlist_track_uris(self, playlist_uri, limit):
         def query_tracks(offset, amount=10, fields=["items.track.uri"]):
-            return self.connection.user_playlist_tracks(self.username,
-                                                        playlist_uri,
-                                                        offset=offset,
-                                                        limit=amount,
-                                                        fields=fields)
+            return self.connection.playlist_tracks(playlist_uri,
+                                                   offset=offset,
+                                                   limit=amount,
+                                                   fields=fields)
         # First we need to query the end of the playlist to see if there's anything overflowing
         try:
             num_overflowing = self.overflow_cache[playlist_uri]
@@ -81,14 +81,10 @@ class SpotifyHandler:
         self.overflow_cache[playlist_uri] = num_overflowing
         return uris
 
-    def get_token(self):
-        return util.prompt_for_user_token(self.username, self.scope, client_id=self.client_id,
-                                          client_secret=self.client_secret, redirect_uri=self.redirect_uri)
-
     # Method to refresh Spotify token
     def refresh_connection(self):
         self.logger.info("Refreshing token")
-        self.connection = spotipy.Spotify(auth=self.get_token())
+        self.connection = spotipy.Spotify(auth_manager=self.auth_manager)
 
     def try_change_overflow_cache(self, playlist_uri, diff):
         if playlist_uri in self.overflow_cache:
