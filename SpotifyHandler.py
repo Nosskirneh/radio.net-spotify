@@ -2,6 +2,7 @@ import spotipy
 import spotipy.util as util
 from spotipy import SpotifyOAuth
 from spotipy.client import SpotifyException
+from spotipy.cache_handler import CacheFileHandler
 from tenacity import retry, stop_after_delay, wait_fixed
 from SetTTLOnceCache import SetTTLOnceCache
 
@@ -23,7 +24,8 @@ class SpotifyHandler:
                                          client_id=self.client_id,
                                          client_secret=self.client_secret,
                                          redirect_uri=self.redirect_uri,
-                                         open_browser=False)
+                                         open_browser=False,
+                                         cache_handler=CacheFileHandler(cache_path=".auth/cachedauth"))
         self.connection = spotipy.Spotify(auth_manager=self.auth_manager)
 
 
