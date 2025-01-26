@@ -2,7 +2,7 @@ radio.net-spotify
 =================
 
 Ever wanted to listen to music but don't wanna play the same music as you always do? Enjoy the music from radio stations but with higher bitrate and without ads!
-radio.net-spotify is an application written in Python that transforms a radio.net station to a playlist storing the most recent tracks. It will sync every three minutes.
+radio.net-spotify is an application written in Python that transforms a radio.net, ilikeradio.se or radioplay.se station to a playlist storing the most recent tracks. It will sync every three minutes.
 
 ## Examples
 Down below are some playlists created with radio.net-spotify.

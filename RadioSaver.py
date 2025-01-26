@@ -12,36 +12,45 @@ import difflib
 
 import logging
 from logging.handlers import RotatingFileHandler
+from RadioProvider import RadioProvider
 
 HISTORY_FILE = 'history.json'
 
 class RadioSaver:
-    # Store the last ten tracks for each station, to prevent adding the same track over and over
-    all_added_tracks = {}
-    all_added_tracks_array = {}
-    stations = {}
-    for stations_list in [radio_net_stations, radio_play_stations, ilikeradio_stations]:
-        stations.update(stations_list)
-
-    if exists(HISTORY_FILE):
-        with open(HISTORY_FILE, 'r') as file:
-            all_added_tracks_temp = json.load(file)
-            for station_id, station in stations.items(): # Convert the JSON data to deques
-                if (str(station_id) not in all_added_tracks_temp):
-                    all_added_tracks[station_id] = deque(maxlen=10)
-                    continue
-
-                all_added_tracks[station_id] = deque(all_added_tracks_temp[station_id], maxlen=10)
-    else:
-        for station_id in stations.keys():
-            all_added_tracks[station_id] = deque(maxlen=10)
-
     def __init__(self):
         self.init_logging()
-        self.spotify_handler = SpotifyHandler(CLIENT_ID, CLIENT_SECRET, len(self.stations), self.logger)
-        self.radio_net = RadioNet(self.logger)
-        self.radio_play = RadioPlay(self.logger)
-        self.ilikeradio = ILikeRadio(self.logger)
+
+        # Store the last ten tracks for each station, to prevent adding the same track over and over
+        self.all_added_tracks = {}
+        self.all_added_tracks_array = {}
+
+        self.providers = []
+        if "radio.net" in configured_providers:
+            self.providers.append(RadioNet(configured_providers["radio.net"], self.logger))
+        if "radioplay.se" in configured_providers:
+            self.providers.append(RadioPlay(configured_providers["radioplay.se"], self.logger))
+        if "ilikeradio.se" in configured_providers:
+            self.providers.append(ILikeRadio(configured_providers["ilikeradio.se"], self.logger))
+        all_stations = {}
+        for provider in self.providers:
+            all_stations.update(provider.stations)
+
+        self.init_history_queue(all_stations)
+        self.spotify_handler = SpotifyHandler(CLIENT_ID, CLIENT_SECRET, len(all_stations), self.logger)
+
+    def init_history_queue(self, stations):
+        if exists(HISTORY_FILE):
+            with open(HISTORY_FILE, 'r') as file:
+                all_added_tracks_temp = json.load(file)
+                for station_id, station in stations.items(): # Convert the JSON data to deques
+                    if (str(station_id) not in all_added_tracks_temp):
+                        self.all_added_tracks[station_id] = deque(maxlen=10)
+                        continue
+
+                    self.all_added_tracks[station_id] = deque(all_added_tracks_temp[station_id], maxlen=10)
+        else:
+            for station_id in stations.keys():
+                self.all_added_tracks[station_id] = deque(maxlen=10)
 
     def init_logging(self):
         log_level = logging.INFO
@@ -69,23 +78,20 @@ class RadioSaver:
 
     def fetch_stations_history(self):
         self.logger.info("Will fetch history...")
-        self.fetch_history_for_endpoint(self.radio_net, radio_net_stations)
-        self.fetch_history_for_endpoint(self.radio_play, radio_play_stations)
-        self.fetch_history_for_endpoint(self.ilikeradio, ilikeradio_stations)
+        for provider in self.providers:
+            self.fetch_history(provider)
 
-    def fetch_history_for_endpoint(self, radio_endpoint, stations):
-        station_ids = []
-        for station_id in stations.keys():
-            station_ids.append(station_id)
-
-        response_by_station = radio_endpoint.fetch_stations_recently_played(station_ids)
+    def fetch_history(self, radio_provider: RadioProvider):
+        response_by_station = radio_provider.fetch_stations_recently_played()
         self.logger.debug("Received data: {}".format(json.dumps(response_by_station, indent=4, sort_keys=False)))
         for station_id, response_station in response_by_station.items():
-            station = stations[station_id]
+            station = radio_provider.stations[station_id]
             station_name = station["station_name"]
             processed_tracks = self.all_added_tracks[station_id]
             self.logger.info("Will sync for station: {}\n".format(station_name))
-            search_titles = radio_endpoint.titles_for_station(response_station, stations[station_id], processed_tracks)
+            search_titles = radio_provider.titles_for_station(response_station,
+                                                              radio_provider.stations[station_id],
+                                                              processed_tracks)
 
             if len(search_titles) == 0:
                 self.logger.info("Found no tracks for station: {}\n".format(station_name))

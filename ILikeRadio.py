@@ -2,10 +2,11 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from tenacity import *
 import json
+from RadioProvider import RadioProvider
 
-class ILikeRadio:
-    def __init__(self, logger):
-        self.logger = logger
+class ILikeRadio(RadioProvider):
+    def __init__(self, stations, logger):
+        super().__init__(stations, logger)
         self.recently_played_url = 'https://app.khz.se/api/v2/timeline?'
 
     def titles_for_station(self, response_station, station, processed_tracks):
@@ -19,9 +20,9 @@ class ILikeRadio:
         
         return search_titles
 
-    def fetch_stations_recently_played(self, station_ids):
+    def fetch_stations_recently_played(self):
         responses = {}
-        for station_id in station_ids:
+        for station_id in self.stations:
             responses[station_id] = self.recently_played_for_station(station_id)
         return responses
 
