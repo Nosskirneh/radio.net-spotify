@@ -20,7 +20,6 @@ Not having the option to host an instance yourself? Open an issue and I can add 
 
 Create the following file `.env`:
 ```
-USERNAME=<username>
 CLIENT_ID=<client ID>
 CLIENT_SECRET=<client secret>
 ```
