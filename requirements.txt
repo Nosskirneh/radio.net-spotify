@@ -2,3 +2,4 @@ spotipy
 tenacity
 lxml
 cachetools
+python-dotenv
