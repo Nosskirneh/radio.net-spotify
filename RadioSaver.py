@@ -15,6 +15,8 @@ from logging.handlers import RotatingFileHandler
 from RadioProvider import RadioProvider
 
 HISTORY_FILE = 'history.json'
+if STORAGE_DIRECTORY:
+    HISTORY_FILE = STORAGE_DIRECTORY + HISTORY_FILE
 
 class RadioSaver:
     def __init__(self):
@@ -36,7 +38,11 @@ class RadioSaver:
             all_stations.update(provider.stations)
 
         self.init_history_queue(all_stations)
-        self.spotify_handler = SpotifyHandler(CLIENT_ID, CLIENT_SECRET, len(all_stations), self.logger)
+        self.spotify_handler = SpotifyHandler(CLIENT_ID,
+                                              CLIENT_SECRET,
+                                              len(all_stations),
+                                              STORAGE_DIRECTORY,
+                                              self.logger)
 
     def init_history_queue(self, stations):
         if exists(HISTORY_FILE):
@@ -55,6 +61,8 @@ class RadioSaver:
     def init_logging(self):
         log_level = logging.INFO
         log_filename = 'log.txt'
+        if STORAGE_DIRECTORY:
+            log_filename = STORAGE_DIRECTORY + log_filename
         self.logger = logging.getLogger('root')
         self.logger.setLevel(log_level)
         formatter = logging.Formatter('%(asctime)s [%(levelname)s]: %(message)s')

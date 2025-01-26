@@ -1,29 +1,31 @@
 import spotipy
-import spotipy.util as util
 from spotipy import SpotifyOAuth
 from spotipy.client import SpotifyException
+from spotipy.cache_handler import CacheFileHandler
 from tenacity import retry, stop_after_delay, wait_fixed
 from SetTTLOnceCache import SetTTLOnceCache
 
 
 class SpotifyHandler:
 
-    def __init__(self, client_id, client_secret, num_playlists, logger):
+    def __init__(self, client_id, client_secret, num_playlists, storage_directory, logger):
         self.client_id = client_id
         self.client_secret = client_secret
         self.logger = logger
         # Only check the number of overflowing tracks once every 12 hours
         self.overflow_cache = SetTTLOnceCache(maxsize=num_playlists, ttl=3600 * 12)
-        self.init_connection()
+        self.init_connection(storage_directory)
 
-    def init_connection(self):
+    def init_connection(self, storage_directory):
         self.scope = 'playlist-modify-public'
         self.redirect_uri = 'http://localhost:8888/callback/'
+        cache_path = f"{storage_directory}/.cachedauth" if storage_directory else ".cachedauth"
         self.auth_manager = SpotifyOAuth(scope=self.scope,
                                          client_id=self.client_id,
                                          client_secret=self.client_secret,
                                          redirect_uri=self.redirect_uri,
-                                         open_browser=False)
+                                         open_browser=False,
+                                         cache_handler=CacheFileHandler(cache_path=cache_path))
         self.connection = spotipy.Spotify(auth_manager=self.auth_manager)
 
 

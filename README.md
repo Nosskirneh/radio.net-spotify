@@ -24,6 +24,8 @@ CLIENT_ID=<client ID>
 CLIENT_SECRET=<client secret>
 ```
 
+Add a `STORAGE_DIRECTORY` to specify a directory to store the state, Spotify auth info and log files if running with Docker.
+
 Build the docker container: `docker build -t radionet-spotify .`
 Run the docker container: `docker run -it --rm --env-file .env -p 8888:8888 radionet-spotify`
 

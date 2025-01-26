@@ -7,6 +7,7 @@ load_dotenv()
 
 CLIENT_ID = os.getenv('CLIENT_ID')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+STORAGE_DIRECTORY = os.getenv('STORAGE_DIRECTORY')
 
 # Station configs
 configured_providers = {
