@@ -3,8 +3,6 @@ from urllib.request import Request, urlopen
 from tenacity import *
 import json
 
-from bs4 import BeautifulSoup
-
 class RadioNet:
     def __init__(self, logger):
         self.logger = logger
