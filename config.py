@@ -12,7 +12,7 @@ STORAGE_DIRECTORY = os.getenv('STORAGE_DIRECTORY')
 # Station configs
 configured_providers = {
     "radio.net": {
-        "antenneclassicrock": {
+        "antennebayernclassicrock": {
             "station_name": "ANTENNE BAYERN - Classic Rock Live",
             "playlist_uri": 'spotify:playlist:6IMRUAc8RBz0sLLvyJDy2j',
             "limit": 400
